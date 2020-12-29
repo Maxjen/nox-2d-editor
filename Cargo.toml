@@ -1,0 +1,26 @@
+[package]
+name = "nox-2d-editor"
+version = "0.1.0"
+authors = ["Maximilian Jensen"]
+edition = "2018"
+license = "MIT"
+
+[dependencies]
+legion = "*"
+wgpu = "*"
+winit = "0.24.0"
+log = "0.4.0"
+env_logger = "0.8.2"
+futures = "0.3"
+image = "0.23"
+glam = "0.11.0"
+serde = { version = "1.0", features = ["derive"] }
+ron = "*"
+bytemuck = { version = "1.4", features = ["derive"] }
+anyhow = "1.0"
+
+[build-dependencies]
+shaderc = "0.6"
+glob = "0.3"
+anyhow = "1.0"
+fs_extra = "1.2"
