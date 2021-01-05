@@ -9,10 +9,11 @@ mod app_state;
 mod asset;
 mod events;
 mod camera;
-mod mesh_pipeline;
 mod mesh;
 mod texture;
 mod loader;
+mod transform;
+mod physics;
 
 fn main() {
     let application = Application::new();

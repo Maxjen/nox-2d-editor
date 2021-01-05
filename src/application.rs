@@ -1,9 +1,15 @@
 use std::time::Instant;
 use legion::*;
+use physics::TimeSinceLastPhysicsUpdate;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
+};
+use rapier2d::{
+    dynamics::{JointSet, RigidBodySet, IntegrationParameters},
+    geometry::{BroadPhase, NarrowPhase, ColliderSet},
+    pipeline::PhysicsPipeline,
 };
 use crate::{
     wgpu_state::WgpuState,
@@ -15,9 +21,9 @@ use crate::{
     camera::Camera,
     asset,
     asset::Assets,
-    mesh_pipeline,
-    mesh_pipeline::MeshPipeline,
+    mesh,
     texture::Texture,
+    physics,
 };
 
 pub struct DeltaTime(pub f32);
@@ -45,19 +51,33 @@ impl Application {
         self.resources.insert(Assets::<Texture>::new());
         self.resources.insert(DeltaTime(0.0));
 
+        {
+            self.resources.insert(PhysicsPipeline::new());
+            self.resources.insert(IntegrationParameters::default());
+            self.resources.insert(BroadPhase::new());
+            self.resources.insert(NarrowPhase::new());
+            self.resources.insert(RigidBodySet::new());
+            self.resources.insert(ColliderSet::new());
+            self.resources.insert(JointSet::new());
+            self.resources.insert(physics::TimeSinceLastPhysicsUpdate(0.0));
+        }
+
         let mesh_pipeline = {
             let wgpu_state = self.resources.get_mut::<WgpuState>().unwrap();
-            MeshPipeline::new(&wgpu_state)
+            mesh::Pipeline::new(&wgpu_state)
         };
         self.resources.insert(mesh_pipeline);
 
         {
             let mut wgpu_state = self.resources.get_mut::<WgpuState>().unwrap();
             let mut app_state = self.resources.get_mut::<AppState>().unwrap();
-            let pipeline = self.resources.get::<MeshPipeline>().unwrap();
+            let pipeline = self.resources.get::<mesh::Pipeline>().unwrap();
             let mut textures = self.resources.get_mut::<Assets<Texture>>().unwrap();
+            let mut rigid_body_set = self.resources.get_mut::<RigidBodySet>().unwrap();
+            let mut collider_set = self.resources.get_mut::<ColliderSet>().unwrap();
             let mut command_buffer = legion::systems::CommandBuffer::new(&self.world);
-            app_state.set_current_mesh_index(Some(0), &mut wgpu_state, &pipeline, &mut textures, &mut command_buffer);
+            //app_state.set_current_mesh_index(Some(0), &mut wgpu_state, &pipeline, &mut textures, &mut command_buffer);
+            app_state.spawn_scene(&mut wgpu_state, &pipeline, &mut textures, &mut rigid_body_set, &mut collider_set, &mut command_buffer);
             command_buffer.flush(&mut self.world);
         }
     }
@@ -66,8 +86,10 @@ impl Application {
         let mut schedule = Schedule::builder()
             .add_system(app_state::handle_input_system())
             .add_system(camera::update_camera_system())
-            .add_system(mesh_pipeline::update_camera_buffer_system())
-            .add_system(mesh_pipeline::render_meshes_system())
+            .add_system(physics::update_physics_system())
+            .add_system(physics::copy_transforms_from_rigid_bodies_system())
+            //.add_system(mesh_pipeline::update_camera_buffer_system())
+            .add_system(mesh::render_meshes_system())
             .add_system(events::clear_events_system::<winit::event::KeyboardInput>())
             .add_system(asset::remove_unused_assets_system::<Texture>())
             .build();
@@ -121,6 +143,9 @@ impl Application {
                         let mut delta_time = self.resources.get_mut::<DeltaTime>().unwrap();
                         delta_time.0 = start.elapsed().as_secs_f32();
                         start = Instant::now();
+
+                        let mut time_since_last_physics_update = self.resources.get_mut::<TimeSinceLastPhysicsUpdate>().unwrap();
+                        time_since_last_physics_update.0 += delta_time.0;
                     }
                     schedule.execute(&mut self.world, &mut self.resources);
                     {

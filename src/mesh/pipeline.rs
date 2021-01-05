@@ -5,6 +5,7 @@ use legion::world::SubWorld;
 use wgpu::util::DeviceExt;
 use crate::{
     wgpu_state::WgpuState,
+    transform::Transform2D,
     mesh,
     camera::Camera,
 };
@@ -38,19 +39,21 @@ impl Uniforms {
             0.0, 0.0, 0.5, 0.0,
             0.0, 0.0, 0.5, 1.0,
         ]);*/
-        self.view_proj = (/*opengl_to_wgpu * */camera.build_view_projection_matrix()).to_cols_array();
+        //self.view_proj = (/*opengl_to_wgpu * */camera.build_view_projection_matrix()).to_cols_array();
+        self.view_proj = camera.build_view_projection_matrix().to_cols_array();
     }
 }
 
-pub struct MeshPipeline {
+pub struct Pipeline {
     render_pipeline: wgpu::RenderPipeline,
     pub texture_bind_group_layout: wgpu::BindGroupLayout,
     uniforms: Uniforms,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
+    pub mesh_uniform_bind_group_layout: wgpu:: BindGroupLayout,
 }
 
-impl MeshPipeline {
+impl Pipeline {
     pub fn new(wgpu_state: &WgpuState) -> Self {
         let texture_bind_group_layout =
             wgpu_state.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -107,12 +110,25 @@ impl MeshPipeline {
             label: Some("uniform_bind_group"),
         });
 
-        let vs_module = wgpu_state.device.create_shader_module(wgpu::include_spirv!("../shaders/shader.vert.spv"));
-        let fs_module = wgpu_state.device.create_shader_module(wgpu::include_spirv!("../shaders/shader.frag.spv"));
+        let mesh_uniform_bind_group_layout = wgpu_state.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStage::VERTEX,
+                ty: wgpu::BindingType::UniformBuffer {
+                    dynamic: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+            label: Some("uniform_bind_group_layout"),
+        });
+
+        let vs_module = wgpu_state.device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.vert.spv"));
+        let fs_module = wgpu_state.device.create_shader_module(wgpu::include_spirv!("../../shaders/shader.frag.spv"));
 
         let render_pipeline_layout = wgpu_state.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[&texture_bind_group_layout, &uniform_bind_group_layout],
+            bind_group_layouts: &[&texture_bind_group_layout, &uniform_bind_group_layout, &mesh_uniform_bind_group_layout],
             push_constant_ranges: &[],
         });
 
@@ -163,11 +179,12 @@ impl MeshPipeline {
             uniforms,
             uniform_buffer,
             uniform_bind_group,
+            mesh_uniform_bind_group_layout,
         }
     }
 }
 
-#[system]
+/*#[system]
 pub fn update_camera_buffer(
     #[resource] state: &mut WgpuState,
     #[resource] pipeline: &mut MeshPipeline,
@@ -179,11 +196,18 @@ pub fn update_camera_buffer(
         0,
         bytemuck::cast_slice(&[pipeline.uniforms]),
     );
-}
+}*/
 
 #[system]
+#[read_component(Transform2D)]
 #[read_component(mesh::Mesh)]
-pub fn render_meshes(world: &mut SubWorld, #[resource] state: &mut WgpuState, #[resource] pipeline: &MeshPipeline) {
+#[write_component(mesh::PipelineParams)]
+pub fn render_meshes(
+    world: &mut SubWorld,
+    #[resource] state: &mut WgpuState,
+    #[resource] pipeline: &mut Pipeline,
+    #[resource] camera: &Camera,
+) {
     let frame = {
         let frame_result = state.swap_chain.get_current_frame();
         if frame_result.is_err() {
@@ -194,6 +218,22 @@ pub fn render_meshes(world: &mut SubWorld, #[resource] state: &mut WgpuState, #[
         //self.swap_chain.get_current_frame().unwrap().output
         frame_result.unwrap().output
     };
+
+    // Update camera buffer.
+    pipeline.uniforms.update_view_proj(&camera);
+    state.queue.write_buffer(
+        &pipeline.uniform_buffer,
+        0,
+        bytemuck::cast_slice(&[pipeline.uniforms]),
+    );
+
+    {
+        let mut query = <(&Transform2D, &mut mesh::PipelineParams)>::query();
+            //.filter(maybe_changed::<Transform2D>()); // Doesn't seem to do anything.
+        for (transform, params) in query.iter_mut(world) {
+            params.update_from_transform(transform, &state.queue);
+        }
+    }
 
     let mut encoder = state
         .device
@@ -222,8 +262,9 @@ pub fn render_meshes(world: &mut SubWorld, #[resource] state: &mut WgpuState, #[
         render_pass.set_pipeline(&pipeline.render_pipeline);
         render_pass.set_bind_group(1, &pipeline.uniform_bind_group, &[]);
 
-        let mut query = <&mesh::Mesh>::query();
-        for mesh in query.iter(world) {
+        let mut query = <(&mesh::Mesh, &mesh::PipelineParams)>::query();
+        for (mesh, params) in query.iter(world) {
+            render_pass.set_bind_group(2, &params.uniform_bind_group, &[]);
             render_pass.set_bind_group(0, &mesh.texture_bind_group, &[]);
             render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
             render_pass.set_index_buffer(mesh.index_buffer.slice(..));

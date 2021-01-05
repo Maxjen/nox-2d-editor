@@ -7,7 +7,6 @@ use crate::{
 
 pub struct Camera {
     eye: glam::Vec3,
-    target: glam::Vec3,
     pub size: (f32, f32),
     znear: f32,
     zfar: f32,
@@ -22,7 +21,6 @@ impl Camera {
     pub fn new() -> Self {
         Self {
             eye: (0.0, 0.0, 20.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
             size: (800.0, 600.0),
             znear: 0.1,
             zfar: 100.0,
@@ -35,7 +33,7 @@ impl Camera {
     }
 
     pub fn build_view_projection_matrix(&self) -> glam::Mat4 {
-        let view = glam::Mat4::look_at_rh(self.eye, self.target, glam::Vec3::unit_y());
+        let view = glam::Mat4::look_at_rh(self.eye, glam::Vec3::new(self.eye.x, self.eye.y, 0.0), glam::Vec3::unit_y());
         let proj = glam::Mat4::orthographic_rh(0.0, self.size.0, 0.0, self.size.1, self.znear, self.zfar);
         proj * view
     }
@@ -44,7 +42,7 @@ impl Camera {
 #[system]
 pub fn update_camera(
     #[resource] camera: &mut Camera,
-    #[resource] delta_time: &mut DeltaTime,
+    #[resource] delta_time: &DeltaTime,
     #[resource] input_events: &mut Events::<KeyboardInput>,
 ) {
     for event in &input_events.events {
@@ -93,5 +91,4 @@ pub fn update_camera(
     }
 
     camera.eye += direction;
-    camera.target += direction;
 }

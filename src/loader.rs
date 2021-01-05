@@ -9,12 +9,54 @@ use std::fs::File;
 #[derive(Default, Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct Scene {
+    pub scene_nodes: Vec<SceneNode>,
     pub meshes: Vec<MeshData>,
+    pub rigid_bodies: Vec<RigidBody>,
+    pub colliders: Vec<Collider>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SceneNode {
+    pub name: String,
+    pub components: Vec<Component>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum Component {
+    Transform { translation: (f32, f32), rotation: f32 },
+    Mesh(String),
+    RigidBody(String),
+    Collider(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RigidBody {
+    pub name: String,
+    pub status: RigidBodyStatus,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum RigidBodyStatus {
+    Static,
+    Dynamic,
+    Kinematic,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Collider {
+    pub name: String,
+    pub shape: Shape,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum Shape {
+    Cuboid(f32, f32),
+    Blubb,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MeshData {
-    mesh_name: String,
+    pub mesh_name: String,
     pub texture: String,
     pub vertices: Vec<Vertex>,
 

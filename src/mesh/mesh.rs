@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 use crate::{
     wgpu_state::WgpuState,
-    mesh_pipeline::MeshPipeline,
+    mesh::Pipeline,
     loader::MeshData,
     asset::{Handle, Assets},
     texture::Texture,
@@ -48,7 +48,7 @@ pub struct Mesh {
 impl Mesh {
     pub fn new(
         state: &WgpuState,
-        pipeline: &MeshPipeline,
+        pipeline: &Pipeline,
         textures: &mut Assets<Texture>,
         mesh_data: &MeshData
     ) -> Self {
