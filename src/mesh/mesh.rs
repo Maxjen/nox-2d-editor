@@ -2,7 +2,7 @@ use wgpu::util::DeviceExt;
 use crate::{
     wgpu_state::WgpuState,
     mesh::Pipeline,
-    loader::MeshData,
+    static_data::MeshData,
     asset::{Handle, Assets},
     texture::Texture,
 };

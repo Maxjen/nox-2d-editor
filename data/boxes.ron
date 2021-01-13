@@ -1,0 +1,88 @@
+(
+    scene_nodes: [
+        (
+            name: "box_static",
+            components: [
+                Transform(
+                    translation: (400.0, 64.0),
+                    rotation: 0.0,
+                ),
+                Mesh("box"),
+                RigidBody("rb_box_static"),
+                Collider("c_box"),
+            ],
+        ),
+        (
+            name: "box_dynamic",
+            components: [
+                Transform(
+                    translation: (384.0, 300.0),
+                    rotation: 0.0,
+                ),
+                Mesh("box"),
+                RigidBody("rb_box_dynamic"),
+                Collider("c_box"),
+            ],
+        ),
+    ],
+    meshes: [
+        (
+            mesh_name: "box",
+            texture: "box.png",
+            vertices: [
+                (
+                    x: -32.0,
+                    y: -32.0,
+                    u: 0.0,
+                    v: 0.0,
+                ),
+                (
+                    x: 32.0,
+                    y: -32.0,
+                    u: 1.0,
+                    v: 0.0,
+                ),
+                (
+                    x: 32.0,
+                    y: 32.0,
+                    u: 1.0,
+                    v: 1.0,
+                ),
+                (
+                    x: -32.0,
+                    y: 32.0,
+                    u: 0.0,
+                    v: 1.0,
+                ),
+            ],
+            triangles: [
+                (
+                    v1: 0,
+                    v2: 1,
+                    v3: 2,
+                ),
+                (
+                    v1: 2,
+                    v2: 3,
+                    v3: 0,
+                ),
+            ],
+        ),
+    ],
+    rigid_bodies: [
+        (
+            name: "rb_box_static",
+            status: Static,
+        ),
+        (
+            name: "rb_box_dynamic",
+            status: Dynamic,
+        ),
+    ],
+    colliders: [
+        (
+            name: "c_box",
+            shape: Cuboid(32.0, 32.0),
+        ),
+    ],
+)

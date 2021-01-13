@@ -1,0 +1,85 @@
+(
+    scene_nodes: [
+        (
+            name: "box_static",
+            prefab: "boxes/box_static",
+            components: [
+                Transform(
+                    translation: (400.0, 64.0),
+                    rotation: 0.0,
+                ),
+            ],
+        ),
+        (
+            name: "box_dynamic_1",
+            prefab: "boxes/box_dynamic",
+            components: [
+                Transform(
+                    translation: (384.0, 300.0),
+                    rotation: 0.0,
+                ),
+            ],
+        ),
+        (
+            name: "box_child",
+            components: [
+                Parent("box_dynamic_1"),
+                Transform(
+                    translation: (20.0, 20.0),
+                    rotation: 0.0,
+                ),
+                Mesh("boxes/box"),
+            ],
+        ),
+        (
+            name: "box_dynamic_2",
+            prefab: "boxes/box_dynamic",
+            components: [
+                Transform(
+                    translation: (364.0, 200.0),
+                    rotation: 0.0,
+                ),
+            ],
+        ),
+        (
+            name: "sabre",
+            components: [
+                Transform(
+                    translation: (600.0, 270.0),
+                    rotation: -45.0,
+                ),
+                Mesh("meshes/sabre.png"),
+            ],
+        ),
+        (
+            name: "longsword",
+            components: [
+                Transform(
+                    translation: (800.0, 200.0),
+                    rotation: 45.0,
+                ),
+                Mesh("meshes/longsword.png"),
+            ],
+        ),
+        (
+            name: "tree",
+            components: [
+                Transform(
+                    translation: (800.0, 200.0),
+                    rotation: 0.0,
+                ),
+                Mesh("meshes/tree.png"),
+            ],
+        ),
+        (
+            name: "rock",
+            components: [
+                Transform(
+                    translation: (800.0, 200.0),
+                    rotation: 0.0,
+                ),
+                Mesh("meshes/rock.png"),
+            ],
+        ),
+    ],
+)

@@ -12,15 +12,14 @@ use rapier2d::{
     pipeline::PhysicsPipeline,
 };
 use crate::{
-    wgpu_state::WgpuState,
-    app_state,
-    app_state::AppState,
-    events,
-    events::Events,
-    camera,
-    camera::Camera,
-    asset,
-    asset::Assets,
+    wgpu_state::{self, WgpuState},
+    ui::UiState,
+    app_state::{self, AppState},
+    transform,
+    events::{self, Events},
+    command::Command,
+    camera::{self, Camera},
+    asset::{self, Assets},
     mesh,
     texture::Texture,
     physics,
@@ -46,6 +45,7 @@ impl Application {
     fn setup_world(&mut self, window: &Window) {
         self.resources.insert(futures::executor::block_on(WgpuState::new(window)));
         self.resources.insert(AppState::new());
+        self.resources.insert(Events::<Command>::default());
         self.resources.insert(Events::<winit::event::KeyboardInput>::default());
         self.resources.insert(Camera::new());
         self.resources.insert(Assets::<Texture>::new());
@@ -69,26 +69,23 @@ impl Application {
         self.resources.insert(mesh_pipeline);
 
         {
-            let mut wgpu_state = self.resources.get_mut::<WgpuState>().unwrap();
-            let mut app_state = self.resources.get_mut::<AppState>().unwrap();
-            let pipeline = self.resources.get::<mesh::Pipeline>().unwrap();
-            let mut textures = self.resources.get_mut::<Assets<Texture>>().unwrap();
-            let mut rigid_body_set = self.resources.get_mut::<RigidBodySet>().unwrap();
-            let mut collider_set = self.resources.get_mut::<ColliderSet>().unwrap();
-            let mut command_buffer = legion::systems::CommandBuffer::new(&self.world);
-            //app_state.set_current_mesh_index(Some(0), &mut wgpu_state, &pipeline, &mut textures, &mut command_buffer);
-            app_state.spawn_scene(&mut wgpu_state, &pipeline, &mut textures, &mut rigid_body_set, &mut collider_set, &mut command_buffer);
-            command_buffer.flush(&mut self.world);
+            let mut commands = self.resources.get_mut::<Events<Command>>().unwrap();
+            commands.send(Command::SetCurrentScene(0));
         }
+        self.handle_commands();
     }
 
     pub fn run(mut self) {
-        let mut schedule = Schedule::builder()
+        let mut schedule_1 = Schedule::builder()
             .add_system(app_state::handle_input_system())
             .add_system(camera::update_camera_system())
             .add_system(physics::update_physics_system())
             .add_system(physics::copy_transforms_from_rigid_bodies_system())
+            .build();
             //.add_system(mesh_pipeline::update_camera_buffer_system())
+        
+        let mut schedule_2 = Schedule::builder()
+            .add_system(wgpu_state::prepare_frame_system())
             .add_system(mesh::render_meshes_system())
             .add_system(events::clear_events_system::<winit::event::KeyboardInput>())
             .add_system(asset::remove_unused_assets_system::<Texture>())
@@ -96,11 +93,17 @@ impl Application {
 
         let event_loop = EventLoop::new();
         let window = WindowBuilder::new()
-            .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
+            .with_title("2D Editor")
+            .with_maximized(true)
             .build(&event_loop)
             .unwrap();
         
         self.setup_world(&window);
+
+        let mut ui_state = {
+            let wgpu_state = self.resources.get_mut::<WgpuState>().unwrap();
+            UiState::new(&window, &wgpu_state)
+        };
 
         let mut start = Instant::now();
         event_loop.run(move |event, _, control_flow| {
@@ -147,9 +150,17 @@ impl Application {
                         let mut time_since_last_physics_update = self.resources.get_mut::<TimeSinceLastPhysicsUpdate>().unwrap();
                         time_since_last_physics_update.0 += delta_time.0;
                     }
-                    schedule.execute(&mut self.world, &mut self.resources);
+
+                    schedule_1.execute(&mut self.world, &mut self.resources);
+                    transform::propagate_transforms(&mut self.world, &mut self.resources);
+                    schedule_2.execute(&mut self.world, &mut self.resources);
+                    ui_state.render_ui(&window, &self.resources);
+
+                    self.handle_commands();
+
                     {
                         let mut wgpu_state = self.resources.get_mut::<WgpuState>().unwrap();
+                        wgpu_state.current_frame = None;
                         match &wgpu_state.render_result {
                             Ok(_) => {}
                             //Err(wgpu::SwapChainError::Lost) => wgpu_state.resize(wgpu_state.size),
@@ -167,6 +178,16 @@ impl Application {
                 }
                 _ => {}
             }
+            ui_state.platform.handle_event(ui_state.imgui.io_mut(), &window, &event);
         });
+    }
+
+    pub fn handle_commands(&mut self) {
+        // Handle commands.
+        app_state::handle_commands(&mut self.world, &mut self.resources);
+
+        // Clear commands.
+        let mut commands = self.resources.get_mut::<Events::<Command>>().unwrap();
+        events::clear_events(&mut commands);
     }
 }

@@ -6,7 +6,7 @@ use rapier2d::{
     pipeline::PhysicsPipeline,
 };
 
-use crate::transform::Transform2D;
+use crate::transform::LocalTransform;
 
 pub struct TimeSinceLastPhysicsUpdate(pub f32);
 
@@ -45,12 +45,12 @@ pub fn update_physics(
 
 #[system(for_each)]
 pub fn copy_transforms_from_rigid_bodies(
-    transform: &mut Transform2D,
+    transform: &mut LocalTransform,
     rigid_body_handle: &RigidBodyHandle,
     #[resource] rigid_body_set: &RigidBodySet,
 ) {
     let rigid_body = rigid_body_set.get(rigid_body_handle.0).unwrap();
     let position = rigid_body.position();
-    transform.translation = glam::Vec3::new(position.translation.vector.x * 64.0, position.translation.vector.y * 64.0, 0.0);
-    transform.rotation = position.rotation.angle().to_degrees();
+    transform.0.translation = glam::Vec3::new(position.translation.vector.x * 64.0, position.translation.vector.y * 64.0, 0.0);
+    transform.0.rotation = position.rotation.angle().to_degrees();
 }

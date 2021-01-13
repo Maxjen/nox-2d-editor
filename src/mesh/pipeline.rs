@@ -5,7 +5,7 @@ use legion::world::SubWorld;
 use wgpu::util::DeviceExt;
 use crate::{
     wgpu_state::WgpuState,
-    transform::Transform2D,
+    transform::GlobalTransform,
     mesh,
     camera::Camera,
 };
@@ -199,7 +199,7 @@ pub fn update_camera_buffer(
 }*/
 
 #[system]
-#[read_component(Transform2D)]
+#[read_component(GlobalTransform)]
 #[read_component(mesh::Mesh)]
 #[write_component(mesh::PipelineParams)]
 pub fn render_meshes(
@@ -208,16 +208,8 @@ pub fn render_meshes(
     #[resource] pipeline: &mut Pipeline,
     #[resource] camera: &Camera,
 ) {
-    let frame = {
-        let frame_result = state.swap_chain.get_current_frame();
-        if frame_result.is_err() {
-            state.render_result = Err(frame_result.err().unwrap());
-            //return Ok(());
-            return;
-        }
-        //self.swap_chain.get_current_frame().unwrap().output
-        frame_result.unwrap().output
-    };
+    if let None = state.current_frame { return; }
+    let frame = &state.current_frame.as_ref().unwrap().output;
 
     // Update camera buffer.
     pipeline.uniforms.update_view_proj(&camera);
@@ -228,10 +220,11 @@ pub fn render_meshes(
     );
 
     {
-        let mut query = <(&Transform2D, &mut mesh::PipelineParams)>::query();
-            //.filter(maybe_changed::<Transform2D>()); // Doesn't seem to do anything.
+        let mut query =
+            <(&GlobalTransform, &mut mesh::PipelineParams)>::query();
+                //.filter(maybe_changed::<Transform2D>()); // Doesn't seem to do anything.
         for (transform, params) in query.iter_mut(world) {
-            params.update_from_transform(transform, &state.queue);
+            params.update_from_transform(&transform.0, &state.queue);
         }
     }
 

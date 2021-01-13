@@ -1,3 +1,4 @@
+use legion::*;
 use winit::window::Window;
 
 pub struct WgpuState {
@@ -8,6 +9,7 @@ pub struct WgpuState {
     pub swap_chain: wgpu::SwapChain,
     pub size: winit::dpi::PhysicalSize<u32>,
     pub render_result: Result<(), wgpu::SwapChainError>,
+    pub current_frame: Option<wgpu::SwapChainFrame>,
 }
 
 impl WgpuState {
@@ -41,7 +43,7 @@ impl WgpuState {
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::Mailbox,
         };
         let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
@@ -52,7 +54,8 @@ impl WgpuState {
             sc_desc,
             swap_chain,
             size,
-            render_result: Ok(())
+            render_result: Ok(()),
+            current_frame: None,
         }
     }
 
@@ -62,4 +65,18 @@ impl WgpuState {
         self.sc_desc.height = new_size.height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
     }
+}
+
+#[system]
+pub fn prepare_frame(#[resource] state: &mut WgpuState) {
+    state.current_frame = {
+        let frame_result = state.swap_chain.get_current_frame();
+        if frame_result.is_err() {
+            state.render_result = Err(frame_result.err().unwrap());
+            //return Ok(());
+            return;
+        }
+        //self.swap_chain.get_current_frame().unwrap().output
+        Some(frame_result.unwrap())
+    };
 }
