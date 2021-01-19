@@ -17,7 +17,6 @@ pub struct UiState {
     pub platform: WinitPlatform,
     renderer: Renderer,
     last_cursor: Option<MouseCursor>,
-    current_collection: usize,
 }
 
 impl UiState {
@@ -57,7 +56,6 @@ impl UiState {
             platform,
             renderer,
             last_cursor: None,
-            current_collection: 0,
         }
     }
 
@@ -78,7 +76,7 @@ impl UiState {
         let ui = self.imgui.frame();
 
         {
-            let mut current_collection = self.current_collection;
+            let mut current_collection = app_state.current_collection;
 
             let size = window.inner_size().to_logical::<f32>(window.scale_factor());
             let panel = imgui::Window::new(im_str!("Outliner"));
@@ -99,24 +97,32 @@ impl UiState {
                         imgui::ListBox::new(im_str!(""))
                             .build_simple(&ui, &mut current_collection, collection_names.as_slice(), &|item: &String| {
                                 let result = unsafe { ImStr::from_utf8_with_nul_unchecked(item.as_bytes()).into() };
-                                //println!("{:?}", result);
                                 return result;
                             });
-                        /*ui.text(im_str!("Hello World!"));
-                        ui.separator();
+                        /*ui.separator();
                         let mouse_pos = ui.io().mouse_pos;
-                        ui.text(im_str!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));
-                        imgui::TreeNode::new(im_str!("Test"))
-                            .default_open(true)
-                            .build(&ui, || {
-                                imgui::TreeNode::new(im_str!("Test2")).default_open(false).build(&ui, || {});
-                            });*/
+                        ui.text(im_str!("Mouse Position: ({:.1},{:.1})", mouse_pos[0], mouse_pos[1]));*/
+                    }
+                    if CollapsingHeader::new(im_str!("Scene Nodes"))
+                        .default_open(true)
+                        .build(&ui) {
+
+                        let collection = &app_state.data_accessor.collections[current_collection];
+                        for i in 0..collection.scene_nodes.len() {
+                            let is_root = if let None = collection.scene_nodes[i].get_parent() {
+                                true
+                            } else {
+                                false
+                            };
+                            if is_root {
+                                Self::add_tree_nodes_recursive((current_collection, i), &app_state, &ui);
+                            }
+                        }
                     }
                 }
             );
 
-            if self.current_collection != current_collection {
-                self.current_collection = current_collection;
+            if app_state.current_collection != current_collection {
                 commands.send(Command::SetCurrentScene(current_collection));
             }
         }
@@ -150,6 +156,30 @@ impl UiState {
                 .expect("Rendering failed");
         }
         wgpu_state.queue.submit(Some(encoder.finish()));
+    }
+
+    fn add_tree_nodes_recursive(scene_node: (usize, usize), app_state: &AppState, ui: &Ui) {
+        let collection = &app_state.data_accessor.collections[scene_node.0];
+        let node = &collection.scene_nodes[scene_node.1];
+        let mut name = node.name.clone();
+        name.push_str("\0");
+        let is_leaf = node.children.is_empty();
+        let is_selected = if let Some(selected_node) = app_state.selected_scene {
+            selected_node == scene_node
+        } else { false };
+        imgui::TreeNode::new(unsafe { ImStr::from_utf8_with_nul_unchecked(name.as_bytes().into()) })
+            .default_open(true)
+            .open_on_arrow(true)
+            .leaf(is_leaf)
+            .selected(is_selected)
+            .build(&ui, || {
+                for child in &node.children {
+                    Self::add_tree_nodes_recursive((scene_node.0, *child), app_state, &ui);
+                }
+                /*if ui.is_item_clicked(MouseButton::Left) {
+                    app_state.selected_scene = Some(scene_node);
+                }*/
+            });
     }
 }
 

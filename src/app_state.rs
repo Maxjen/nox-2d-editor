@@ -24,6 +24,9 @@ pub struct AppState {
     entities: Vec<Entity>,
     entity_indices: HashMap<String, usize>,
     pub root_entities: Vec<Entity>,
+
+    pub current_collection: usize,
+    pub selected_scene: Option<(usize, usize)>,
 }
 
 impl AppState {
@@ -35,6 +38,8 @@ impl AppState {
             entities: Vec::new(),
             entity_indices: HashMap::new(),
             root_entities: Vec::new(),
+            current_collection: 0,
+            selected_scene: None,
         }
     }
 }
@@ -121,7 +126,9 @@ fn set_current_scene(index: usize, world: &mut World, resources: &mut Resources)
 
     let mut root_nodes = Vec::new();
     {
-        let app_state = resources.get::<AppState>().unwrap();
+        let mut app_state = resources.get_mut::<AppState>().unwrap();
+        app_state.current_collection = index;
+        
         let collection = &app_state.data_accessor.collections[index];
 
         info!("Set current collection to {}", index);
